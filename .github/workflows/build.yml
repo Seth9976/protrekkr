@@ -53,12 +53,14 @@ jobs:
           Write-Host "zlib.lib 位置: $($zlibLib.FullName)"  
           echo "ZLIB_LIB_DIR=$($zlibLib.DirectoryName)" >> $env:GITHUB_ENV  
   
-      - name: Build ProTrekkr  
+      - name: Build ProTrekkr via INCLUDE and LIB environment variables  
         shell: pwsh  
         run: |  
-          $proj = Get-ChildItem -Path $env:GITHUB_WORKSPACE -Filter "ProTrekkr.vcxproj" | Select-Object -First 1  
+          $proj = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Filter "ProTrekkr.vcxproj" | Select-Object -First 1  
           if (-not $proj) { Write-Error "未找到 ProTrekkr.vcxproj"; exit 1 }  
-          msbuild $proj.FullName /p:Configuration=release /p:Platform=Win32 /m /p:IncludePath="$env:SDL_INC_DIR;$env:ZLIB_DIR" /p:LibraryPath="$env:SDL_LIB_DIR;$env:ZLIB_LIB_DIR"  
+          $env:INCLUDE = "$env:SDL_INC_DIR;$env:ZLIB_DIR"  
+          $env:LIB = "$env:SDL_LIB_DIR;$env:ZLIB_LIB_DIR"  
+          msbuild $proj.FullName /p:Configuration=release /p:Platform=Win32 /m  
           if ($LASTEXITCODE -ne 0) { Write-Error "ProTrekkr 编译失败"; exit 1 }  
   
       - name: Probe output binary and stage SDL2.dll  
