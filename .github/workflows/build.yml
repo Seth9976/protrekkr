@@ -23,16 +23,23 @@ jobs:
           Invoke-WebRequest -Uri "https://github.com/libsdl-org/SDL/releases/download/release-2.30.9/SDL2-devel-2.30.9-VC.zip" -OutFile "$env:GITHUB_WORKSPACE\deps\sdl2.zip"  
           Expand-Archive -Path "$env:GITHUB_WORKSPACE\deps\sdl2.zip" -DestinationPath "$env:GITHUB_WORKSPACE\deps" -Force  
   
-      - name: Probe SDL2 include and library directories  
+      - name: Restage SDL2 headers under SDL2 subfolder  
         shell: pwsh  
         run: |  
           $sdlInc = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\deps" -Recurse -Filter "SDL.h" | Select-Object -First 1  
+          if (-not $sdlInc) { Write-Error "SDL.h 探查失败"; exit 1 }  
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\sdl-inc\SDL2" | Out-Null  
+          Copy-Item "$($sdlInc.DirectoryName)\*.h" "$env:GITHUB_WORKSPACE\sdl-inc\SDL2" -Force  
+          Write-Host "SDL2 头文件已重排到 $env:GITHUB_WORKSPACE\sdl-inc\SDL2"  
+          echo "SDL_INC_DIR=$env:GITHUB_WORKSPACE\sdl-inc" >> $env:GITHUB_ENV  
+  
+      - name: Probe SDL2 library directory  
+        shell: pwsh  
+        run: |  
           $sdlLib = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\deps" -Recurse -Filter "SDL2.lib" | Where-Object { $_.DirectoryName -match "x86" } | Select-Object -First 1  
           if (-not $sdlLib) { $sdlLib = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\deps" -Recurse -Filter "SDL2.lib" | Select-Object -First 1 }  
-          if (-not $sdlInc -or -not $sdlLib) { Write-Error "SDL2 目录探查失败"; exit 1 }  
-          Write-Host "SDL2 include 目录: $($sdlInc.DirectoryName)"  
+          if (-not $sdlLib) { Write-Error "SDL2.lib 探查失败"; exit 1 }  
           Write-Host "SDL2 lib 目录: $($sdlLib.DirectoryName)"  
-          echo "SDL_INC_DIR=$($sdlInc.DirectoryName)" >> $env:GITHUB_ENV  
           echo "SDL_LIB_DIR=$($sdlLib.DirectoryName)" >> $env:GITHUB_ENV  
   
       - name: Build bundled zlib project  
