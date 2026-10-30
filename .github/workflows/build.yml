@@ -41,24 +41,24 @@ jobs:
           echo "SDL_INC_PARENT=$env:GITHUB_WORKSPACE\deps\include" >> $env:GITHUB_ENV
           echo "SDL_LIB_DIR=$($sdlLib.DirectoryName)" >> $env:GITHUB_ENV
 
-      - name: Build bundled zlib library
-        shell: pwsh
-        run: |
-          $zlibProj = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Recurse -Filter "zlib.vcxproj" | Select-Object -First 1
-          if (-not $zlibProj) { Write-Error "未探查到 zlib.vcxproj"; exit 1 }
-          Write-Host "开始编译 zlib 工程: $($zlibProj.FullName)"
-          msbuild $zlibProj.FullName /p:Configuration=Release /p:Platform=Win32 /m
-          if ($LASTEXITCODE -ne 0) { Write-Error "zlib 编译失败"; exit 1 }
-          $zlibHeader = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Recurse -Filter "zlib.h" | Select-Object -First 1
-          if (-not $zlibHeader) { Write-Error "未探查到 zlib.h"; exit 1 }
-          $zlibLib = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Recurse -Filter "zlib.lib" | Where-Object { $_.FullName -notmatch "deps" } | Select-Object -First 1
-          if (-not $zlibLib) { Write-Error "未探查到 zlib.lib"; exit 1 }
-          Write-Host "已探查到 zlib 头文件目录: $($zlibHeader.DirectoryName)"
-          Write-Host "已探查到 zlib 库文件路径: $($zlibLib.FullName)"
-          Copy-Item -Path "$($zlibHeader.DirectoryName)\*.h" -Destination "$env:GITHUB_WORKSPACE\release\ptk\replay\lib\include" -Force
-          Copy-Item -Path $zlibLib.FullName -Destination "$env:GITHUB_WORKSPACE" -Force
-          echo "ZLIB_INC_DIR=$($zlibHeader.DirectoryName)" >> $env:GITHUB_ENV
+      - name: Build bundled zlib library  
+        shell: pwsh  
+        run: |  
+          $zlibProj = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Recurse -Filter "zlib.vcxproj" | Select-Object -First 1  
+          if (-not $zlibProj) { Write-Error "未探查到 zlib.vcxproj"; exit 1 }  
+          Write-Host "开始编译 zlib 工程: $($zlibProj.FullName)"  
+          msbuild $zlibProj.FullName /p:Configuration=Release /p:Platform=Win32 /m  
+          if ($LASTEXITCODE -ne 0) { Write-Error "zlib 编译失败"; exit 1 }  
+          $zlibHeader = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Recurse -Filter "zlib.h" | Select-Object -First 1  
+          if (-not $zlibHeader) { Write-Error "未探查到 zlib.h"; exit 1 }  
+          $zlibLib = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Recurse -Filter "zlib.lib" | Where-Object { $_.FullName -notmatch "deps" } | Select-Object -First 1  
+          if (-not $zlibLib) { Write-Error "未探查到 zlib.lib"; exit 1 }  
+          Write-Host "已探查到 zlib 头文件目录: $($zlibHeader.DirectoryName)"  
+          Write-Host "已探查到 zlib 库文件路径: $($zlibLib.FullName)"  
+          Copy-Item -Path "$($zlibHeader.DirectoryName)\*.h" -Destination "$env:GITHUB_WORKSPACE\release\ptk\replay\lib\include" -Force  
+          echo "ZLIB_INC_DIR=$($zlibHeader.DirectoryName)" >> $env:GITHUB_ENV  
           echo "ZLIB_LIB_DIR=$($zlibLib.DirectoryName)" >> $env:GITHUB_ENV
+
 
       - name: Inject build properties and compile ProTrekkr
         shell: pwsh
