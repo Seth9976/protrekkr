@@ -29,20 +29,15 @@ jobs:
           $sdlHeader = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\deps" -Recurse -Filter "SDL.h" | Select-Object -First 1
           if (-not $sdlHeader) { Write-Error "未探查到 SDL.h 头文件"; exit 1 }
           Write-Host "探查到 SDL.h 路径: $($sdlHeader.FullName)"
-
           $sdlIncDir = New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\deps\include\SDL2"
           Copy-Item -Path "$($sdlHeader.DirectoryName)\*.h" -Destination $sdlIncDir.FullName -Force
-
           $ptkInternalInc = New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\release\ptk\replay\lib\include\SDL2"
           Copy-Item -Path "$($sdlHeader.DirectoryName)\*.h" -Destination $ptkInternalInc.FullName -Force
-
           $sdlLib = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\deps" -Recurse -Filter "SDL2.lib" | Where-Object { $_.DirectoryName -match "x86" } | Select-Object -First 1
           if (-not $sdlLib) { $sdlLib = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\deps" -Recurse -Filter "SDL2.lib" | Select-Object -First 1 }
           if (-not $sdlLib) { Write-Error "未探查到 x86 架构 SDL2.lib 库文件"; exit 1 }
           Write-Host "探查到 SDL2.lib 目录: $($sdlLib.DirectoryName)"
-
           Copy-Item -Path "$($sdlLib.DirectoryName)\*.lib" -Destination "$env:GITHUB_WORKSPACE" -Force
-
           echo "SDL_INC_ROOT=$env:GITHUB_WORKSPACE\deps\include" >> $env:GITHUB_ENV
           echo "SDL_LIB_DIR=$($sdlLib.DirectoryName)" >> $env:GITHUB_ENV
 
@@ -52,26 +47,15 @@ jobs:
           $zlibProj = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Recurse -Filter "zlib.vcxproj" | Select-Object -First 1
           if (-not $zlibProj) { Write-Error "未探查到 zlib.vcxproj"; exit 1 }
           Write-Host "探查到 zlib 工程文件: $($zlibProj.FullName)"
-
           msbuild $zlibProj.FullName /p:Configuration=Release /p:Platform=Win32 /m
           if ($LASTEXITCODE -ne 0) { Write-Error "zlib 编译失败"; exit 1 }
-
           $zlibHeader = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Recurse -Filter "zlib.h" | Where-Object { $_.FullName -notmatch "deps" } | Select-Object -First 1
           if (-not $zlibHeader) { Write-Error "未探查到 zlib.h"; exit 1 }
-
           $zlibLib = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Recurse -Filter "zlib.lib" | Where-Object { $_.FullName -notmatch "deps" } | Select-Object -First 1
           if (-not $zlibLib) { Write-Error "未探查到 zlib.lib"; exit 1 }
           Write-Host "探查到 zlib.lib 路径: $($zlibLib.FullName)"
-
-          if ($zlibLib.DirectoryName -ne $env:GITHUB_WORKSPACE) {
-            Copy-Item -Path $zlibLib.FullName -Destination "$env:GITHUB_WORKSPACE" -Force
-          }
-
           $replayInclude = "$env:GITHUB_WORKSPACE\release\ptk\replay\lib\include"
-          if (Test-Path $replayInclude) {
-            Copy-Item -Path "$($zlibHeader.DirectoryName)\*.h" -Destination $replayInclude -Force
-          }
-
+          if (Test-Path $replayInclude) { Copy-Item -Path "$($zlibHeader.DirectoryName)\*.h" -Destination $replayInclude -Force }
           echo "ZLIB_INC_DIR=$($zlibHeader.DirectoryName)" >> $env:GITHUB_ENV
           echo "ZLIB_LIB_DIR=$($zlibLib.DirectoryName)" >> $env:GITHUB_ENV
 
@@ -80,99 +64,43 @@ jobs:
         run: |
           $ptkProj = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Recurse -Filter "ProTrekkr.vcxproj" | Select-Object -First 1
           if (-not $ptkProj) { Write-Error "未探查到 ProTrekkr.vcxproj"; exit 1 }
-
           $targetsFile = "$env:GITHUB_WORKSPACE\Directory.Build.targets"
           $xmlContent = "<Project><PropertyGroup><IncludePath>`$(IncludePath);$env:SDL_INC_ROOT;$env:ZLIB_INC_DIR</IncludePath><LibraryPath>`$(LibraryPath);$env:SDL_LIB_DIR;$env:ZLIB_LIB_DIR;$env:GITHUB_WORKSPACE</LibraryPath></PropertyGroup><ItemDefinitionGroup><ClCompile><AdditionalIncludeDirectories>`%(AdditionalIncludeDirectories);$env:SDL_INC_ROOT;$env:ZLIB_INC_DIR</AdditionalIncludeDirectories></ClCompile><Link><AdditionalLibraryDirectories>`%(AdditionalLibraryDirectories);$env:SDL_LIB_DIR;$env:ZLIB_LIB_DIR;$env:GITHUB_WORKSPACE</AdditionalLibraryDirectories></Link></ItemDefinitionGroup></Project>"
           Set-Content -Path $targetsFile -Value $xmlContent -Encoding UTF8
-
           $env:_CL_ = "/I`"$env:SDL_INC_ROOT`" /I`"$env:ZLIB_INC_DIR`""
           $env:_LINK_ = "/LIBPATH:`"$env:SDL_LIB_DIR`" /LIBPATH:`"$env:ZLIB_LIB_DIR`" /LIBPATH:`"$env:GITHUB_WORKSPACE`""
-
           Write-Host "开始编译主程序工程: $($ptkProj.FullName)"
           msbuild $ptkProj.FullName /p:Configuration=release /p:Platform=Win32 /m
           if ($LASTEXITCODE -ne 0) { Write-Error "ProTrekkr 编译失败"; exit 1 }
-
           $pluginProj = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Recurse -Filter "plugin.vcxproj" | Select-Object -First 1
-          if ($pluginProj) {
-            Write-Host "探查到插件工程文件，开始编译: $($pluginProj.FullName)"
-            msbuild $pluginProj.FullName /p:Configuration=Release /p:Platform=Win32 /m
-            if ($LASTEXITCODE -ne 0) { Write-Error "Winamp 插件编译失败"; exit 1 }
-          } else {
-            Write-Host "未发现 plugin.vcxproj，跳过插件编译"
-          }
+          if ($pluginProj) { Write-Host "探查到插件工程文件，开始编译: $($pluginProj.FullName)"; msbuild $pluginProj.FullName /p:Configuration=Release /p:Platform=Win32 /m; if ($LASTEXITCODE -ne 0) { Write-Error "插件编译失败"; exit 1 } }
 
       - name: Stage complete distribution package
         shell: pwsh
         run: |
-          $runtimeDir = "$env:GITHUB_WORKSPACE\release\ptk"
-          if (-not (Test-Path $runtimeDir)) {
-            Write-Error "未找到运行时目录: $runtimeDir"
-            exit 1
-          }
-
-          Write-Host "运行时目录内容:"
-          Get-ChildItem -Path $runtimeDir -Recurse | ForEach-Object { Write-Host $_.FullName }
-
-          $dist = "$env:GITHUB_WORKSPACE\protrekkr_dist"
-          if (Test-Path $dist) { Remove-Item -Path $dist -Recurse -Force }
-          New-Item -ItemType Directory -Force -Path $dist | Out-Null
-
-          # 复制 release\ptk 下全部运行时资源，包括 install 等目录
-          Copy-Item -Path "$runtimeDir\*" -Destination $dist -Recurse -Force
-
-          # 清理不需要进入发布包的文件
-          Get-ChildItem -Path $dist -Recurse -Directory -Filter "*.app" | Remove-Item -Recurse -Force
-          Get-ChildItem -Path $dist -Recurse -Filter "*.obj" | Remove-Item -Force
-          Get-ChildItem -Path $dist -Recurse -Filter "*.o" | Remove-Item -Force
-
-          # 定位 ptk_win.exe：优先使用 release\ptk\ptk_win.exe
-          $ptkExePath = Join-Path $runtimeDir "ptk_win.exe"
-          if (-not (Test-Path $ptkExePath)) {
-            $ptkExe = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Recurse -Filter "ptk_win.exe" | Select-Object -First 1
-            if (-not $ptkExe) {
-              Write-Error "未探查到编译生成文件 ptk_win.exe"
-              exit 1
-            }
-            $ptkExePath = $ptkExe.FullName
-          }
-          Write-Host "探查到主程序二进制: $ptkExePath"
-          Copy-Item -Path $ptkExePath -Destination $dist -Force
-
-          # 复制 Winamp 插件（如果存在）
+          $sourcePtkPath = "$env:GITHUB_WORKSPACE\release\ptk"
+          if (-not (Test-Path $sourcePtkPath)) { Write-Error "未找到 release\ptk 目录"; exit 1 }
+          $sourcePtk = Get-Item -Path $sourcePtkPath
+          Write-Host "原始数据源目录: $($sourcePtk.FullName)"
+          $distPath = "$env:GITHUB_WORKSPACE\protrekkr_dist"
+          Remove-Item -Path $distPath -Recurse -Force -ErrorAction SilentlyContinue
           $pluginDll = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Recurse -Filter "in_ptk.dll" | Select-Object -First 1
-          if ($pluginDll) {
-            Write-Host "探查到插件二进制: $($pluginDll.FullName)"
-            Copy-Item -Path $pluginDll.FullName -Destination $dist -Force
-          } else {
-            Write-Host "未发现 in_ptk.dll，跳过插件复制"
-          }
-
-          # 复制 SDL2.dll
+          if ($pluginDll) { Write-Host "插件二进制: $($pluginDll.FullName)" }
           $sdlDll = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\deps" -Recurse -Filter "SDL2.dll" | Where-Object { $_.DirectoryName -match "x86" } | Select-Object -First 1
-          if (-not $sdlDll) {
-            $sdlDll = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\deps" -Recurse -Filter "SDL2.dll" | Select-Object -First 1
-          }
-          if (-not $sdlDll) {
-            Write-Error "未探查到 x86 架构 SDL2.dll"
-            exit 1
-          }
-          Write-Host "探查到 SDL2.dll: $($sdlDll.FullName)"
-          Copy-Item -Path $sdlDll.FullName -Destination $dist -Force
-          Copy-Item -Path $sdlDll.FullName -Destination "$dist\SDL.dll" -Force
-
-          # 最终校验
-          $distExe = Join-Path $dist "ptk_win.exe"
-          if (-not (Test-Path $distExe)) {
-            Write-Error "发布目录中缺少 ptk_win.exe: $distExe"
-            exit 1
-          }
-          if (-not (Test-Path (Join-Path $dist "SDL2.dll"))) {
-            Write-Error "发布目录中缺少 SDL2.dll"
-            exit 1
-          }
-
-          Write-Host "最终发布目录内容:"
-          Get-ChildItem -Path $dist -Recurse | ForEach-Object { Write-Host $_.FullName }
+          if (-not $sdlDll) { $sdlDll = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\deps" -Recurse -Filter "SDL2.dll" | Select-Object -First 1 }
+          if (-not $sdlDll) { Write-Error "未找到 SDL2.dll"; exit 1 }
+          Write-Host "SDL2.dll: $($sdlDll.FullName)"
+          $dist = New-Item -ItemType Directory -Force -Path $distPath
+          Copy-Item -Path "$($sourcePtk.FullName)\*" -Destination $dist.FullName -Recurse -Force
+          Get-ChildItem -Path $dist.FullName -Recurse -Directory -Filter "*.app" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+          Get-ChildItem -Path $dist.FullName -Recurse -Filter "*.obj" | Remove-Item -Force -ErrorAction SilentlyContinue
+          Get-ChildItem -Path $dist.FullName -Recurse -Filter "*.o" | Remove-Item -Force -ErrorAction SilentlyContinue
+          $ptkExeInDist = Get-ChildItem -Path $dist.FullName -Recurse -Filter "ptk_win.exe" | Select-Object -First 1
+          if (-not $ptkExeInDist) { Write-Error "分发目录中未找到 ptk_win.exe"; exit 1 }
+          Write-Host "分发目录主程序: $($ptkExeInDist.FullName)"
+          if ($pluginDll) { Copy-Item -Path $pluginDll.FullName -Destination $dist.FullName -Force }
+          Copy-Item -Path $sdlDll.FullName -Destination $dist.FullName -Force
+          Copy-Item -Path $sdlDll.FullName -Destination "$($dist.FullName)\SDL.dll" -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
