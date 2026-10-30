@@ -76,19 +76,20 @@ jobs:
       - name: Stage full ptk runtime directory and SDL2.dll  
         shell: pwsh  
         run: |  
-          $ptkDir = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\release\ptk" -Directory | Select-Object -First 1  
-          if (-not $ptkDir) { Write-Error "未探查到 release/ptk 目录"; exit 1 }  
-          Write-Host "release/ptk 目录内容探查结果:"  
+          $exe = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Recurse -Filter "ptk_win.exe" | Where-Object { $_.FullName -notmatch "deps" } | Select-Object -First 1  
+          if (-not $exe) { Write-Error "未探查到 ptk_win.exe"; exit 1 }  
+          $ptkDir = $exe.Directory  
+          Write-Host "ptk_win.exe 位置: $($exe.FullName)"  
+          Write-Host "运行时目录: $($ptkDir.FullName)"  
+          Write-Host "运行时目录内容探查结果:"  
           Get-ChildItem $ptkDir.FullName -Recurse | ForEach-Object { Write-Host $_.FullName }  
-          $exe = Get-ChildItem -Path $ptkDir.FullName -Recurse -Filter "ptk_win.exe" | Select-Object -First 1  
-          if (-not $exe) { Write-Error "release/ptk 中未探查到 ptk_win.exe"; exit 1 }  
           Copy-Item -Path $ptkDir.FullName -Destination "$env:GITHUB_WORKSPACE\artifact\ptk" -Recurse -Force  
           $sdlDll = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\deps" -Recurse -Filter "SDL2.dll" | Where-Object { $_.DirectoryName -match "x86" } | Select-Object -First 1  
           if (-not $sdlDll) { $sdlDll = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\deps" -Recurse -Filter "SDL2.dll" | Select-Object -First 1 }  
           if ($sdlDll) { Write-Host "已探查到配套动态链接库: $($sdlDll.FullName)"; Copy-Item -Path $sdlDll.FullName -Destination "$env:GITHUB_WORKSPACE\artifact\ptk" -Force }  
           $skinBmp = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\artifact\ptk" -Recurse -Filter "neural.bmp" | Select-Object -First 1  
           if (-not $skinBmp) { Write-Warning "警告: skins/neural.bmp 不存在, 程序运行时将因缺少皮肤资源静默退出 (src/ptk.cpp Load_Skin_Picture)" }  
-  
+          
       - name: Upload artifact  
         uses: actions/upload-artifact@v4  
         with:  
