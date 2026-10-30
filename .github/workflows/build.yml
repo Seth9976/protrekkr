@@ -75,20 +75,17 @@ jobs:
           msbuild $ptkProj.FullName /p:Configuration=release /p:Platform=Win32 /m
           if ($LASTEXITCODE -ne 0) { Write-Error "ProTrekkr 编译失败"; exit 1 }
 
-      - name: Stage output binaries and runtime libraries
-        shell: pwsh
-        run: |
-          $exe = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Recurse -Filter "ptk_win.exe" | Select-Object -First 1
-          if (-not $exe) { Write-Error "未探查到编译生成文件 ptk_win.exe"; exit 1 }
-          Write-Host "已探查到可执行文件产物: $($exe.FullName)"
-          $artifactDir = New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\artifact"
-          Copy-Item -Path $exe.FullName -Destination $artifactDir.FullName -Force
-          $sdlDll = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\deps" -Recurse -Filter "SDL2.dll" | Where-Object { $_.DirectoryName -match "x86" } | Select-Object -First 1
-          if (-not $sdlDll) { $sdlDll = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\deps" -Recurse -Filter "SDL2.dll" | Select-Object -First 1 }
-          if ($sdlDll) {
-            Write-Host "已探查到配套动态链接库: $($sdlDll.FullName)"
-            Copy-Item -Path $sdlDll.FullName -Destination $artifactDir.FullName -Force
-          }
+      - name: Stage output binaries and runtime libraries  
+        shell: pwsh  
+        run: |  
+          $ptkDir = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\release\ptk" -Directory | Select-Object -First 1  
+          if (-not $ptkDir) { Write-Error "未探查到 release/ptk 目录"; exit 1 }  
+          Write-Host "ptk 目录内容:"  
+          Get-ChildItem $ptkDir.FullName -Recurse | ForEach-Object { Write-Host $_.FullName }  
+          Copy-Item -Path $ptkDir.FullName -Destination "$env:GITHUB_WORKSPACE\artifact\ptk" -Recurse -Force  
+          $sdlDll = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\deps" -Recurse -Filter "SDL2.dll" | Where-Object { $_.DirectoryName -match "x86" } | Select-Object -First 1  
+          if ($sdlDll) { Copy-Item -Path $sdlDll.FullName -Destination "$env:GITHUB_WORKSPACE\artifact\ptk" -Force }
+
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
